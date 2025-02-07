@@ -196,5 +196,5 @@ struct RegisterView: View {
 
 
 #Preview {
-    ContentView()
+    RegisterView()
 }
