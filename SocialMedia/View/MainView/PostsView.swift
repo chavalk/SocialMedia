@@ -8,28 +8,33 @@
 import SwiftUI
 
 struct PostsView: View {
+    @State private var recentPosts: [Post] = []
     @State private var createNewPost: Bool = false
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
-            .hAlign(.center).vAlign(.center)
-            .overlay(alignment: .bottomTrailing) {
-                Button {
-                    createNewPost.toggle()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                        .padding(13)
-                        .background(.black, in: Circle())
+        NavigationStack {
+            ReusablePostsView(posts: $recentPosts)
+                .hAlign(.center).vAlign(.center)
+                .overlay(alignment: .bottomTrailing) {
+                    Button {
+                        createNewPost.toggle()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(13)
+                            .background(.black, in: Circle())
+                    }
+                    .padding(15)
                 }
-                .padding(15)
+                .navigationTitle("Posts")
+        }
+        .fullScreenCover(isPresented: $createNewPost) {
+            CreateNewPost { post in
+                /// - Adding Created Post at the Top of Recent Posts
+                recentPosts.insert(post, at: 0)
             }
-            .fullScreenCover(isPresented: $createNewPost) {
-                CreateNewPost { post in
-                    
-                }
-            }
+        }
     }
 }
 
