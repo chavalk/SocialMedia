@@ -9,9 +9,13 @@ import SwiftUI
 import Firebase
 
 struct ReusablePostsView: View {
+    var basedOnUID: Bool = false
+    var uid: String = ""
     @Binding var posts: [Post]
     /// - View Properties
-    @State var isFetching: Bool = true
+    @State private var isFetching: Bool = true
+    /// - Pagination
+    @State private var paginationDoc: QueryDocumentSnapshot?
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack {
@@ -35,8 +39,12 @@ struct ReusablePostsView: View {
         }
         .refreshable {
             /// - Scroll to Refresh
+            /// Disabling Refresh for UID based Posts
+            guard !basedOnUID else { return }
             isFetching = true
             posts = []
+            /// - Resetting Pagination Doc
+            paginationDoc = nil
             await fetchPosts()
         }
         .task {
@@ -63,6 +71,11 @@ struct ReusablePostsView: View {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     posts.removeAll{post.id == $0.id }
                 }
+            }.onAppear {
+                /// - When Last Post Appears, Fetching New Post (If There)
+                if post.id == posts.last?.id && paginationDoc != nil {
+                    Task {await fetchPosts()}
+                }
             }
             
             Divider()
@@ -74,15 +87,32 @@ struct ReusablePostsView: View {
     func fetchPosts() async {
         do {
             var query: Query!
-            query = Firestore.firestore().collection("Posts")
-                .order(by: "publishedDate", descending: true)
-                .limit(to: 20)
+            /// - Implementing Pagination
+            if let paginationDoc {
+                query = Firestore.firestore().collection("Posts")
+                    .order(by: "publishedDate", descending: true)
+                    .start(afterDocument: paginationDoc)
+                    .limit(to: 20)
+            } else {
+                query = Firestore.firestore().collection("Posts")
+                    .order(by: "publishedDate", descending: true)
+                    .limit(to: 20)
+            }
+            
+            /// - New Query For UID Based Document Fetch
+            /// Simply Filter the Posts Which is not belongs to this UID
+            if basedOnUID {
+                query = query
+                    .whereField("userUID", isEqualTo: uid)
+            }
+            
             let docs = try await query.getDocuments()
             let fetchedPosts = docs.documents.compactMap { doc -> Post? in
                 try? doc.data(as: Post.self)
             }
             await MainActor.run(body: {
-                posts = fetchedPosts
+                posts.append(contentsOf: fetchedPosts)
+                paginationDoc = docs.documents.last
                 isFetching = false
             })
         } catch {
